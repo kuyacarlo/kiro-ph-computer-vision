@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Help Me ERINNNNNN!! — Fist Pump Counter</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0614;
+    color: #d0c8e0;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* --- Fullscreen camera stage --- */
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .stage video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    opacity: 0.75;
+  }
+
+  /* --- HUD Overlay --- */
+  .hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2rem;
+  }
+
+  .hud * { pointer-events: auto; }
+
+  /* Top bar */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .timer {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #64c8e6;
+    text-shadow: 0 0 20px rgba(100, 200, 230, 0.6);
+  }
+
+  .timer.danger { color: #e64040; text-shadow: 0 0 20px rgba(230, 64, 64, 0.6); }
+
+  .score-box {
+    text-align: right;
+  }
+
+  .score {
+    font-size: 5rem;
+    font-weight: bold;
+    color: #ffe080;
+    text-shadow: 0 0 30px rgba(255, 224, 128, 0.7);
+    line-height: 1;
+  }
+
+  .score-label {
+    font-size: 0.8rem;
+    color: #786e64;
+    letter-spacing: 0.2em;
+  }
+
+  /* Center area */
+  .center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+  }
+
+  .flash {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #fff0b0;
+    text-shadow: 0 0 40px rgba(255, 240, 176, 0.9);
+    opacity: 0;
+    transition: opacity 0.1s;
+    animation: none;
+  }
+
+  .flash.active {
+    opacity: 1;
+    animation: flash-fade 0.4s ease-out forwards;
+  }
+
+  @keyframes flash-fade {
+    0% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  .combo {
+    font-size: 1.5rem;
+    color: #ffc832;
+    text-shadow: 0 0 15px rgba(255, 200, 50, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .combo.visible { opacity: 1; }
+
+  .hint {
+    font-size: 1.2rem;
+    color: #a0a0b0;
+    margin-top: 1rem;
+  }
+
+  /* Bottom bar */
+  .bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .arm-indicator {
+    background: rgba(20, 15, 30, 0.7);
+    border: 1px solid #3a3040;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    min-width: 130px;
+  }
+
+  .arm-indicator.up { border-color: #ffe080; }
+
+  .arm-label {
+    font-size: 0.7rem;
+    color: #786e64;
+    letter-spacing: 0.15em;
+  }
+
+  .arm-status {
+    font-size: 1.1rem;
+    color: #786e64;
+    margin-top: 0.3rem;
+  }
+
+  .arm-indicator.up .arm-status { color: #ffe080; }
+
+  .arm-bar {
+    width: 100%;
+    height: 8px;
+    background: #2a2030;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+  }
+
+  .arm-bar-fill {
+    height: 100%;
+    background: #3c8cb4;
+    border-radius: 4px;
+    transition: width 0.1s;
+  }
+
+  .arm-indicator.up .arm-bar-fill { background: #ffe080; }
+
+  .stats {
+    font-size: 0.75rem;
+    color: #786e64;
+    text-align: center;
+  }
+
+  /* --- Prepare screen --- */
+  .prepare-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: rgba(10, 6, 20, 0.6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s;
+  }
+
+  .prepare-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .prepare-title {
+    font-size: 2.5rem;
+    color: #3c8cb4;
+    text-shadow: 0 0 30px rgba(60, 140, 180, 0.6);
+    margin-bottom: 1rem;
+  }
+
+  .prepare-progress {
+    width: 300px;
+    height: 12px;
+    background: #1a1424;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 1rem 0;
+  }
+
+  .prepare-progress-fill {
+    height: 100%;
+    background: #3c8cb4;
+    border-radius: 6px;
+    transition: width 0.1s;
+  }
+
+  /* --- BSOD --- */
+  .bsod {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #000080;
+    color: white;
+    font-family: 'Courier New', monospace;
+    padding: 8%;
+    display: none;
+    flex-direction: column;
+    line-height: 1.6;
+    font-size: 0.85rem;
+  }
+
+  .bsod.active { display: flex; }
+
+  .bsod-header {
+    background: #a0a0a0;
+    color: #000080;
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+  }
+
+  .bsod-restart {
+    margin-top: auto;
+    color: #c0c0c0;
+    font-size: 0.8rem;
+  }
+
+  /* --- Finished screen --- */
+  .finished {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(10, 6, 20, 0.85);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .finished.active { display: flex; }
+
+  .finished-title {
+    font-size: 2rem;
+    color: #ffe080;
+    text-shadow: 0 0 20px rgba(255, 224, 128, 0.5);
+    margin-bottom: 1rem;
+  }
+
+  .finished-score {
+    font-size: 5rem;
+    color: #ffc832;
+    text-shadow: 0 0 40px rgba(255, 200, 50, 0.7);
+    line-height: 1;
+  }
+
+  .finished-stats {
+    margin-top: 1.5rem;
+    font-size: 1rem;
+    color: #a0a0b0;
+    text-align: center;
+    line-height: 2;
+  }
+
+  .finished-restart {
+    margin-top: 2rem;
+    font-size: 0.9rem;
+    color: #786e64;
+  }
+
+  /* Controls */
+  .controls {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .controls button {
+    background: rgba(20, 15, 30, 0.8);
+    border: 1px solid #3a3040;
+    color: #d0c8e0;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .controls button:hover { border-color: #3c8cb4; }
+
+  /* Fullscreen button */
+  .fullscreen-btn {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 30;
+    background: rgba(20, 15, 30, 0.8);
+    border: 1px solid #3a3040;
+    color: #d0c8e0;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    background: rgba(10, 6, 20, 0.8);
+    padding: 0.3rem 1rem;
+    font-size: 0.7rem;
+    color: #786e64;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- Camera -->
+<div class="stage">
+  <video id="cam" playsinline muted autoplay></video>
+</div>
+
+<!-- HUD -->
+<div class="hud" id="hud">
+  <div class="top-bar">
+    <div>
+      <div class="timer" id="timer">{{ timer_seconds }}s</div>
+      <div class="score-label">{{ mode | upper }} MODE — {{ difficulty | upper }}</div>
+    </div>
+    <div class="score-box">
+      <div class="score" id="score">0</div>
+      <div class="score-label">PUMPS</div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="flash" id="flash">ERINNNNNN!!</div>
+    <div class="combo" id="combo"></div>
+    <div class="hint" id="hint">Initializing camera...</div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="arm-indicator" id="arm-left">
+      <div class="arm-label">LEFT</div>
+      <div class="arm-status" id="left-status">—</div>
+      <div class="arm-bar"><div class="arm-bar-fill" id="left-bar" style="width:0%"></div></div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="arm-indicator" id="arm-right">
+      <div class="arm-label">RIGHT</div>
+      <div class="arm-status" id="right-status">—</div>
+      <div class="arm-bar"><div class="arm-bar-fill" id="right-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Prepare overlay -->
+<div class="prepare-overlay" id="prepare">
+  <div class="prepare-title">HELP ME ERINNNNNN!!</div>
+  <div style="color:#a0a0b0">{{ mode | upper }} MODE — {{ difficulty | upper }}</div>
+  <div class="prepare-progress">
+    <div class="prepare-progress-fill" id="prepare-bar" style="width:0%"></div>
+  </div>
+  <div class="hint" id="prepare-hint">Step into frame...</div>
+</div>
+
+<!-- BSOD (compe death) -->
+<div class="bsod" id="bsod">
+  <span class="bsod-header">&nbsp;Eirin&nbsp;</span>
+  <br>
+  A problem has been detected and Eirin has shut down your system to<br>
+  prevent further damage to your scoring record.<br><br>
+  <strong>ERIN_PUMP_TIMING_VIOLATION</strong><br><br>
+  If this is the first time you've seen this Stop error screen,<br>
+  restart your performance. If this screen appears again, follow<br>
+  these steps:<br><br>
+  Check to make sure you are pumping ON THE BEAT.<br>
+  If this is a new song, ask the beatmap creator for any<br>
+  timing updates you might need.<br><br>
+  Technical information:<br><br>
+  *** STOP: 0x000000E4 (<span id="bsod-reason">UNKNOWN</span>)<br>
+  *** help_me_erinnnnnn.sys — Score: <span id="bsod-score">0</span> |
+  Combo: <span id="bsod-combo">0</span> |
+  Hits: <span id="bsod-hits">0/0</span><br><br>
+  Collecting performance data for shrine maiden review...<br>
+  <div class="bsod-restart">Press R or click anywhere to retry</div>
+</div>
+
+<!-- Finished screen (open mode) -->
+<div class="finished" id="finished">
+  <div class="finished-title">TIME'S UP!</div>
+  <div class="finished-score" id="final-score">0</div>
+  <div class="score-label">TOTAL PUMPS</div>
+  <div class="finished-stats" id="final-stats"></div>
+  <div class="finished-restart">Press R or click to restart</div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button id="btn-restart">R Restart</button>
+  <button id="btn-fullscreen">F Fullscreen</button>
+</div>
+
+<div class="status-bar" id="status-bar">Connecting...</div>
+
+<script type="module">
+// --- MediaPipe Pose (browser-side) ---
+import {
+  PoseLandmarker,
+  FilesetResolver,
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs";
+
+const video = document.getElementById('cam');
+let poseLandmarker = null;
+let ws = null;
+let lastState = null;
+let lastPumpAt = 0;
+
+// --- Init MediaPipe ---
+async function initPose() {
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm"
+  );
+  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+      delegate: "GPU",
+    },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  });
+  document.getElementById('status-bar').textContent = 'Pose model loaded';
+}
+
+// --- Camera ---
+async function initCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: 1280, height: 720, facingMode: "user" }
+  });
+  video.srcObject = stream;
+  await video.play();
+  document.getElementById('status-bar').textContent = 'Camera ready';
+}
+
+// --- WebSocket ---
+function initWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+  ws.onopen = () => {
+    document.getElementById('status-bar').textContent = 'Connected';
+  };
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'state') {
+      updateUI(data);
+      lastState = data;
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('status-bar').textContent = 'Disconnected — refreshing...';
+    setTimeout(() => initWebSocket(), 2000);
+  };
+}
+
+// --- Detection loop ---
+function detectLoop() {
+  if (!poseLandmarker || !video.videoWidth) {
+    requestAnimationFrame(detectLoop);
+    return;
+  }
+
+  const result = poseLandmarker.detectForVideo(video, performance.now());
+
+  if (result.landmarks && result.landmarks.length > 0 && ws && ws.readyState === 1) {
+    const landmarks = result.landmarks[0].map(lm => ({
+      x: lm.x,
+      y: lm.y,
+      z: lm.z,
+      visibility: lm.visibility,
+    }));
+    ws.send(JSON.stringify({ type: 'landmarks', landmarks }));
+  } else if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'landmarks', landmarks: null }));
+  }
+
+  requestAnimationFrame(detectLoop);
+}
+
+// --- UI Updates ---
+function updateUI(state) {
+  const scoreEl = document.getElementById('score');
+  const timerEl = document.getElementById('timer');
+  const hintEl = document.getElementById('hint');
+  const comboEl = document.getElementById('combo');
+  const flashEl = document.getElementById('flash');
+  const prepareEl = document.getElementById('prepare');
+  const bsodEl = document.getElementById('bsod');
+  const finishedEl = document.getElementById('finished');
+
+  // Phase handling
+  prepareEl.classList.toggle('hidden', state.phase !== 'prepare');
+  bsodEl.classList.toggle('active', state.phase === 'dead');
+  finishedEl.classList.toggle('active', state.phase === 'finished');
+
+  if (state.phase === 'prepare') {
+    document.getElementById('prepare-bar').style.width = (state.prepare_progress * 100) + '%';
+    document.getElementById('prepare-hint').textContent = state.hint;
+    return;
+  }
+
+  if (state.phase === 'dead') {
+    document.getElementById('bsod-reason').textContent = state.death_reason;
+    document.getElementById('bsod-score').textContent = state.score;
+    document.getElementById('bsod-combo').textContent = state.max_combo;
+    document.getElementById('bsod-hits').textContent = state.compe_hits + '/' + state.compe_total;
+    return;
+  }
+
+  if (state.phase === 'finished') {
+    document.getElementById('final-score').textContent = state.score;
+    let stats = `Max Combo: ${state.max_combo}<br>`;
+    stats += `Left: ${state.left_arm.pumps} | Right: ${state.right_arm.pumps}`;
+    if (state.pumps_per_minute) stats += `<br>Tempo: ${state.pumps_per_minute}/min`;
+    document.getElementById('final-stats').innerHTML = stats;
+    return;
+  }
+
+  // Playing state
+  scoreEl.textContent = state.score;
+
+  if (state.mode === 'open') {
+    timerEl.textContent = state.time_remaining.toFixed(1) + 's';
+    timerEl.classList.toggle('danger', state.time_remaining <= 5);
+  } else {
+    timerEl.textContent = state.compe_hits + '/' + state.compe_total;
+  }
+
+  hintEl.textContent = state.pose_visible ? '' : state.hint;
+
+  // Combo
+  if (state.combo > 1) {
+    comboEl.textContent = state.combo + ' COMBO';
+    comboEl.classList.add('visible');
+  } else {
+    comboEl.classList.remove('visible');
+  }
+
+  // Flash on pump
+  if (state.last_pump_at && state.last_pump_at !== lastPumpAt) {
+    lastPumpAt = state.last_pump_at;
+    flashEl.classList.remove('active');
+    void flashEl.offsetWidth; // force reflow
+    flashEl.classList.add('active');
+  }
+
+  // Arm indicators
+  updateArm('left', state.left_arm);
+  updateArm('right', state.right_arm);
+
+  // Stats
+  let statsText = '';
+  if (state.pumps_per_minute) statsText = state.pumps_per_minute + '/min';
+  document.getElementById('stats').textContent = statsText;
+}
+
+function updateArm(side, arm) {
+  const el = document.getElementById(`arm-${side}`);
+  const statusEl = document.getElementById(`${side}-status`);
+  const barEl = document.getElementById(`${side}-bar`);
+
+  const isUp = arm.phase === 'up';
+  el.classList.toggle('up', isUp);
+  statusEl.textContent = isUp ? 'UP ✊' : 'DOWN';
+  barEl.style.width = Math.max(0, Math.min(100, arm.height / 0.5 * 100)) + '%';
+}
+
+// --- Controls ---
+document.getElementById('btn-restart').addEventListener('click', () => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'command', command: 'reset' }));
+  }
+});
+
+document.getElementById('btn-fullscreen').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'r' || e.key === 'R') {
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'command', command: 'reset' }));
+    }
+  }
+  if (e.key === 'f' || e.key === 'F') {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+});
+
+// Click BSOD/finished to restart
+document.getElementById('bsod').addEventListener('click', () => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'command', command: 'reset' }));
+  }
+});
+document.getElementById('finished').addEventListener('click', () => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'command', command: 'reset' }));
+  }
+});
+
+// --- Startup ---
+async function start() {
+  try {
+    await initCamera();
+    await initPose();
+    initWebSocket();
+    requestAnimationFrame(detectLoop);
+    document.getElementById('status-bar').textContent = 'Running — pump your fists!';
+  } catch (err) {
+    document.getElementById('status-bar').textContent = 'Error: ' + err.message;
+    console.error(err);
+  }
+}
+
+start();
+</script>
+</body>
+</html>
