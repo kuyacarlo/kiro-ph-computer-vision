@@ -1,0 +1,32 @@
+[
+  {
+    "time": 11.332,
+    "reason": "blink",
+    "when": "22:48:51"
+  },
+  {
+    "time": 6.2,
+    "reason": "blink",
+    "when": "22:49:14"
+  },
+  {
+    "time": 34.722,
+    "reason": "blink",
+    "when": "22:49:57"
+  },
+  {
+    "time": 10.532,
+    "reason": "blink",
+    "when": "23:04:08"
+  },
+  {
+    "time": 0.0,
+    "reason": "face_lost",
+    "when": "00:10:01"
+  },
+  {
+    "time": 8.2,
+    "reason": "blink",
+    "when": "00:12:37"
+  }
+]
